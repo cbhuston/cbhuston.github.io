@@ -43,7 +43,7 @@ For reference, the `starts` table alone is more than a quarter of a million ride
 
 ### Everything runs in the browser
 
-The analogy that comes to mind is moving a full stack application into the client. The two server pieces of the original app each have a browser equivalent:
+Both server pieces of the original app now have a browser equivalent:
 
 - **The database becomes DuckDB-WASM.** DuckDB is an analytical SQL engine, and its WebAssembly build runs inside the page. The tables above are downloaded once as Parquet files and every query, from a simple lookup to window functions over 273,455 rows, runs locally in milliseconds.
 - **The hosted model becomes WebLLM.** WebLLM runs a small open model (Qwen 2.5 with 1.5 or 3 billion parameters) on the visitor's own graphics card through WebGPU. The first load downloads 1 to 2 GB of model weights into the browser's cache. After that it starts in seconds and nothing leaves the machine.
@@ -65,16 +65,16 @@ flowchart LR
   V -- error --> L2
   V --> D[(DuckDB in the browser)]
   T --> D
-  D --> A[Model writes the answer from the returned rows only]
+  D --> A[Answer: exact template for tools, model-written for custom SQL]
 ```
 
-1. **Tier 0, the router (zero tokens).** Most questions people ask about a race are predictable: tell me about this horse, compare two horses, how does this jockey do in Grade 1 races, who has early speed, who changed riders. A keyword router recognizes these, resolves the horse, jockey and trainer names, and sends them straight to one of 14 tested SQL tools. The tools are ported from the original Lynk Lab queries (past performances, jockey and trainer records, the last-30-starts ROI, first-time riders, past Derby results) plus new ones such as the pace map and the AI value table.
+1. **Tier 0, the router (zero tokens).** Most questions people ask about a race are predictable: tell me about this horse, compare two horses, how does this jockey do in Grade 1 races, who has early speed, who changed riders. A keyword router recognizes these, resolves the horse, jockey and trainer names, and sends them straight to one of 16 tested SQL tools. The router also reads filters out of the question, such as a track name, a wet or turf surface, sprints or routes, a year, graded stakes or favorites, so "D. Wayne Lukas on wet tracks at Churchill Downs" becomes exactly that query. The tools are ported from the original Lynk Lab queries (past performances, jockey and trainer records, the last-30-starts ROI, first-time riders, past Derby results) plus new ones such as the pace map, the AI value table and a list of which Derby horses have won under any of those filters.
 2. **Tier 1, tool choice.** When the router does not recognize a question, the model sees a one-line description of each tool and the names in the race, and replies with a tiny JSON object naming the tool and its arguments.
-3. **Tier 2, text to SQL.** When no tool fits ("which Derby trainers have won the most graded stakes since 2023?"), the model writes a SQL query from a verbose data dictionary: every column with its type, a plain-English description, its units and its real allowed values (the actual track conditions, race types, grades and track codes are read from the data when the page loads). It also gets five worked examples, including one that shows how to decline a question. The query is checked before it runs: one statement, read-only, no setting changes, wrapped in a 100-row limit. If DuckDB rejects it, the error goes back to the model for one retry, the same rewrite loop the original cloud function used.
+3. **Tier 2, text to SQL.** When no tool fits ("which Derby trainers have won the most graded stakes since 2023?"), the model writes a SQL query from a verbose data dictionary: every column with its type, a plain-English description, its units and its real allowed values (the actual track conditions, race types, grades and track codes are read from the data when the page loads). It also gets six worked examples, including one that shows how to decline a question. The query is checked before it runs: one statement, read-only, no setting changes, wrapped in a 100-row limit, and a question about the Derby horses cannot be filtered on the Derby trainers or jockeys instead. If any check or DuckDB itself rejects the query, the error goes back to the model for one retry, the same rewrite loop the original cloud function used.
 
 **When the data cannot answer, it says so.** The dictionary ends with an explicit list of what the data does not contain (workouts, veterinary records, results after the Derby, races outside North America and so on). If a question needs any of it, the model must reply `NO_DATA` with a reason instead of writing SQL, and the app tells the user plainly that it cannot answer. A query that comes back empty gets the same honest message instead of a guess, and the model that writes the final answer is told exactly what the rows represent, so it cannot describe a table of all-surface speed figures as "muddy track" results.
 
-In every case the final answer is written by the model from **only the rows the query returned**, capped at 15 rows and 12 columns. The model never does arithmetic. Win percentages, returns on investment and averages are computed by SQL, which is why the answers stay as accurate as the original's.
+**Who writes the answer:** when a tested tool answers, the sentence is filled in from a template straight from the query results, so the numbers in the text are always the numbers in the table. The model only writes the answer for custom SQL, and then it sees **only the rows the query returned**, capped at 15 rows, with every value labeled by its column when there are only a few rows. In both cases the model never does arithmetic. Win percentages, returns on investment and averages are computed by SQL, which is why the answers stay as accurate as the original's.
 
 ### Why it uses so few tokens
 
@@ -82,20 +82,20 @@ In every case the final answer is written by the model from **only the rows the 
 |---|---|---|
 | Original Derby app, every question | All horse, jockey, trainer and Derby statistics as text | ~174,500 characters, ~44,000 tokens |
 | Tier 0 router | Nothing | 0 tokens |
-| Tier 1 tool choice | 14 one-line tool descriptions + the names in the race | ~2,100 characters, ~550 tokens |
-| Tier 2 text to SQL | Verbose dictionary for only the tables the question needs + real column values + names + 5 examples | ~6,700 characters, ~1,700 tokens (up to ~9,700 / ~2,500 with every table) |
-| Answer | The question + at most 15 result rows | ~1,500 characters, ~400 tokens |
+| Tier 1 tool choice | 16 one-line tool descriptions + the names in the race | ~2,400 characters, ~600 tokens |
+| Tier 2 text to SQL | Verbose dictionary for only the tables the question needs + real column values + names + 6 examples | ~7,100 characters, ~1,800 tokens (up to ~10,100 / ~2,600 with every table) |
+| Answer for a tool | Nothing, the template fills in the numbers | 0 tokens |
+| Answer for custom SQL | The question + at most 15 result rows | ~1,500 characters, ~400 tokens |
 
 : Prompt sizes per step. The app shows the exact token count under every answer. {#tbl-tokens}
 
-A typical question takes the Tier 0 path and about 400 to 600 tokens in total. The most expensive path (tool choice, SQL with the full dictionary, a retry and the answer) is around 6,000 tokens. In other words, the hardest question in Lynk Lab costs about a seventh of what the easiest question cost in the original, and it runs for free on the visitor's own hardware.
+A typical question takes the Tier 0 path and uses no tokens at all, and one that needs the model to pick a tool uses about 600. The most expensive path (tool choice, SQL with the full dictionary, a retry and the answer) is around 6,500 tokens. In other words, the hardest question in Lynk Lab costs about a seventh of what the easiest question cost in the original, and it runs for free on the visitor's own hardware.
 
-Four design choices make that possible:
+Four design choices make that possible. First, the dictionary is verbose, but only where it is needed. The model gets a detailed description of the tables rather than their contents, and only for the tables a question touches, so a jockey question sends the `starts` and `field` descriptions while a question about a horse's form sends `past_performances`. Detail is what makes small models write correct SQL, and picking the tables is what keeps that detail affordable. A dictionary also costs the same no matter how many rows sit behind it, so the dataset can grow from one race to every race without the prompt growing.
 
-- **A verbose dictionary, but only where it is needed.** The model gets a detailed description of the tables, not their contents, and only for the tables a question touches: a jockey question sends the `starts` and `field` descriptions, a question about a horse's form sends `past_performances`. Detail is what makes small models write correct SQL, and selecting tables is what keeps that detail affordable. A dictionary costs the same no matter how many rows sit behind it, so the dataset can grow from one race to every race without the prompt growing.
-- **The database does the math.** Asking a language model to compute a win percentage from 10,000 rides is slow, expensive and error-prone. Asking it to write `avg((finish = 1)::INT)` is cheap and exact.
-- **Small outputs.** Tool choice is a short JSON object (80 tokens at most), SQL is capped at 220 tokens and answers at 200. Small models are fast when they write little.
-- **Deterministic first.** Anything a keyword router can do correctly, it does for free. The model is reserved for language: understanding unusual questions and writing the answer.
+Second, the database does the math. Asking a language model to compute a win percentage from 10,000 rides is slow, expensive and error-prone, while asking it to write `avg((finish = 1)::INT)` is cheap and exact. On top of that, the outputs are small. Tool choice is a short JSON object (80 tokens at most), SQL is capped at 220 tokens and answers at 200, and small models are fast when they write little.
+
+Third and most importantly, anything that can be done deterministically is. If the keyword router and a template can answer a question correctly, they do it for free, and the model is saved for the part that actually needs language: understanding unusual questions and writing answers for custom queries.
 
 ### Suggestions that do not always pick the favorite
 
@@ -120,13 +120,13 @@ Three consecutive bet suggestions picked Sovereignty, Final Gambit and Baeza, ea
 
 ## Limitations
 
-- **A database bug I had to work around.** While testing a named question ("how has Sovereignty run on wet tracks?") I found that the DuckDB-WASM build I started on (1.29.0) silently dropped a `horse = 'Sovereignty'` filter when it was combined with a `horse IN (subquery)` filter, returning all 17 horses. Newer releases fix it, so the page now pins 1.32.0, and the tools and the data dictionary avoid that pattern entirely. The lesson is the same one as everywhere else in this project: check the numbers, not just the code.
+**A database bug I had to work around:** while testing a named question ("how has Sovereignty run on wet tracks?") I found that the DuckDB-WASM build I started on (1.29.0) silently dropped a `horse = 'Sovereignty'` filter when it was combined with a `horse IN (subquery)` filter, returning all 17 horses. Newer releases fix it, so the page now pins 1.32.0, and the tools and the data dictionary avoid that pattern entirely. It was a good reminder to check the numbers that come back and not only whether the code runs.
 
-- **It needs WebGPU for the AI.** Chrome or Edge on a desktop with a recent graphics card runs the model well. Other browsers still get every built-in question with tables and written summaries, but not open-ended questions.
-- **Small models are small.** A 1.5 billion parameter model writes good SQL for clear questions and occasionally misreads an ambiguous one. The validation and retry loop catches errors that DuckDB rejects, but not a valid query that answers a slightly different question. Showing the SQL behind every answer keeps that visible.
-- **Charts are race-day records.** Results reflect the official order when the chart was published, so later rulings (such as the 2021 Medina Spirit disqualification) are not applied.
-- **Two horses have no past performances.** Luxor Cafe and Admire Daytona raced in Japan before the Derby, and the chart data only covers North American racing.
-- **One race.** The demo covers the 2025 Kentucky Derby. The architecture does not change for a full card or a full season. Only the data files grow.
+Small models are also small. A 1.5 billion parameter model writes good SQL for clear questions and occasionally misreads an ambiguous one. For example, in early testing it answered "which Derby horses have won a Grade 1?" by filtering on horses whose trainer was in the Derby, and it once described a trainer's 426 wet-track starts as "50 starts" by reading the wins column. Those two mistakes are why the horse-versus-trainer check exists and why tool answers now come from templates. However, the checks only catch the mistakes I have seen, so a valid query that answers a slightly different question can still get through, and showing the SQL behind every answer keeps that visible.
+
+The AI also needs WebGPU, meaning Chrome or Edge on a desktop with a recent graphics card. Other browsers still get every built-in question with tables and written summaries, but not open-ended questions.
+
+On the data side, the charts are race-day records, so results reflect the official order when the chart was published and later rulings (such as the 2021 Medina Spirit disqualification) are not applied. Luxor Cafe and Admire Daytona have no past performances, because they raced in Japan before the Derby and the chart data only covers North American racing. Finally, the demo covers one race, but the architecture does not change for a full card or a full season, only the data files grow.
 
 ## What's next
 

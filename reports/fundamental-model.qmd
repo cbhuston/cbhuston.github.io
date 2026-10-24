@@ -4,7 +4,7 @@ subtitle: "What drives a fundamental horse racing model, and what doesn't"
 author: "Cooper Huston"
 date: "2026-10-24"
 abstract: |
-  I built a fundamental horse racing model that never looks at the betting odds of the race it is predicting, trained it on fourteen years of Daily Racing Form result charts and tested it walk-forward from 2019 to 2025, so every prediction comes from a model that had never seen that year. The model picks the winner 35% of the time on unseen races, against 13% for a random pick. The biggest gains came from information the model did not have before: pace and stretch figures rebuilt from the charts' points of call, field-relative versions of every number, a neural network that reads the whole field at once and online ratings that separate trainers from jockeys from sires. Tuning the model barely mattered. This paper walks through the data, the feature families, the results year by year and the things that did not work.
+  I built a fundamental horse racing model that never looks at the betting odds of the race it is predicting, trained it on fourteen years of Daily Racing Form result charts and tested it walk-forward from 2019 to 2025, so every prediction comes from a model that had never seen that year. The model picks the winner 35% of the time on unseen races, against 13% for a random pick. The biggest gains came from information the model did not have before: pace and stretch figures rebuilt from the charts' points of call, field-relative versions of every number, a neural network that reads the whole field at once and online ratings that separate trainers from jockeys from sires, while tuning the model itself barely moved the needle. This paper walks through the data, the feature families, the results year by year and the things that did not work.
 ---
 
 ## Problem
@@ -13,10 +13,7 @@ Every horse race comes with a crowd. By post time thousands of bettors have put 
 
 **Problem statement:** build the best possible model of who wins a horse race using only what was knowable before the race from the horses' past performances, and nothing from the betting on the race itself.
 
-There are two practical reasons to want this model on its own:
-
-1. **It is an independent second opinion.** A betting model works by finding where the crowd is wrong. A model that formed its view without the crowd is the cleanest source of disagreement [@benter1994].
-2. **Some bets need a probability before any odds exist.** For a daily double or a Pick 3, the later races have no win pool yet when the bet is placed, so the only usable forecast for those legs is a fundamental one.
+There are two practical reasons to want this model on its own. First, it is an independent second opinion. A betting model works by finding where the crowd is wrong, and a model that formed its view without the crowd is the cleanest source of disagreement there is [@benter1994]. Second, some bets need a probability before any odds exist. For a daily double or a Pick 3, the later races have no win pool yet when the bet is placed, so the only usable forecast for those legs is a fundamental one.
 
 ## Data
 
@@ -24,10 +21,7 @@ There are two practical reasons to want this model on its own:
 
 Each chart records the race conditions (track, surface, distance, class, purse), every starter's connections (trainer, jockey, owner, sire, dam), equipment and medication, and the running of the race: the position and lengths behind at each point of call, the final time, the speed figure, the official finish and the payoffs [@drfcharts].
 
-**The leakage rule:** a chart is written after the race, so everything in it is post-race information. I only use chart data in two ways:
-
-- **As history for later races.** A horse's speed figure from its last start is a feature for its next start. Connection records (a trainer's wins) use a trailing window that ends the day before the race.
-- **As the label.** Who won today is the target, never an input.
+**The leakage rule:** a chart is written after the race, so everything in it is post-race information. Therefore I only use chart data in two ways: as history for later races, and as the label. For example, a horse's speed figure from its last start is a feature for its next start, and a trainer's win record uses a trailing window that ends the day before the race. Who won today is the target and never an input.
 
 Same-day features (for example, how a jockey has done in earlier races on today's card) only use races that were already official before the race being predicted.
 
@@ -80,19 +74,15 @@ Trees score each horse mostly on its own row. A race is a set of horses that int
 
 ![The neural fundamental model. Each horse is encoded, attention layers let every horse see the rest of the field, and a softmax produces probabilities that sum to one.](../figures/nn_architecture.png){#fig-nn}
 
-The network alone was about as good as the trees. However, the two make different mistakes, so a fixed blend (half trees, a quarter each of two five-seed network ensembles) beat the trees by 0.006 to 0.010 in every single year from 2019 to 2025, with every confidence interval clear of zero. That consistency is the result I trust most in this whole project: a gain that shows up in seven separate years is not luck.
+The network alone was about as good as the trees. However, the two make different mistakes, so a fixed blend (half trees, a quarter each of two five-seed network ensembles) beat the trees by 0.006 to 0.010 in every single year from 2019 to 2025, with every confidence interval clear of zero. That consistency is the result I trust most in this whole project, because a gain that shows up in seven separate years is very hard to get by luck.
 
 ### Entity ratings: separating the trainer from the jockey from the horse
 
-The classic way to measure a trainer is a win-rate window: wins over the last 365 days, maybe compared with how often the trainer's horses were expected to win. Win-rate windows have three problems:
-
-- **Confounding.** Top trainers use top jockeys on good horses, so a window credits all three with the same wins.
-- **Small samples.** A trainer with six starts off a layoff and two wins looks like a genius.
-- **Wrong yardstick.** Raw win rate says who is good. What I want to know is who is better than their horses' prices suggest.
+The classic way to measure a trainer is a win-rate window: wins over the last 365 days, maybe compared with how often the trainer's horses were expected to win. Win-rate windows have three problems. First, they are confounded: top trainers use top jockeys on good horses, so a window credits all three with the same wins. Second, the samples are small, and a trainer with six starts off a layoff and two wins looks like a genius. Third and most importantly, it is the wrong yardstick. Raw win rate tells you who is good, when what I want to know is who is better than their horses' prices suggest.
 
 The ratings fix all three. Every past race is modeled as a conditional logit whose baseline is the race's closing probabilities from the chart, plus an effect for each trainer, jockey, horse, owner and combinations such as trainer at a track, trainer off a layoff or after a claim, jockey by surface and distance, and sire by surface and distance (18 types in all). After each racing day, every effect is updated with that day's results, and all of them are estimated together, so a trainer only gets credit for what the jockey and the horse do not explain.
 
-Each rating carries its own uncertainty, like a Kalman filter [@kalman1960] or a Glicko chess rating [@glickman1999]. The analogy that comes to mind is Elo for chess [@elo1978], except every player also has an error bar: a surprising win moves a new trainer's rating a lot and a veteran's rating a little. Ratings used to predict a race on day D only include results through day D-1.
+Each rating carries its own uncertainty, like a Kalman filter [@kalman1960] or a Glicko chess rating [@glickman1999]. Think of it like the Elo rating for chess players [@elo1978], except every player also has an error bar: a surprising win moves a new trainer's rating a lot and a veteran's rating a little. Ratings used to predict a race on day D only include results through day D-1.
 
 ## Results
 
@@ -118,12 +108,11 @@ I measure each family the same way: add it to the model, train on 2019 to mid-20
 
 ![Gain from adding each feature family, scored on all 2023 races. Blue intervals are clear of zero. The morning line (orange) is an odds line, tested for reference and not used.](../figures/fund_family_gains.png){#fig-gains}
 
-The verdicts:
+Pace and classic handicapping is by far the biggest fundamental gain (+0.0066, interval +0.0047 to +0.0087), so rebuilding pace figures from the points of call was worth more than any other single idea I had. Entity ratings (+0.0035), connections and same-day form (+0.0030), within-race ranks (+0.0026) and deeper horse history (+0.0024) are all real as well, with intervals clear of zero.
 
-- **Pace and classic handicapping is by far the biggest fundamental gain** (+0.0066, interval +0.0047 to +0.0087). Rebuilding pace figures from the points of call was worth more than any other single idea.
-- **Entity ratings (+0.0035), connections and same-day form (+0.0030), within-race ranks (+0.0026) and deeper horse history (+0.0024) are all real**, with intervals clear of zero.
-- **Pedigree, field shape, bias-adjusted last race and race-day announcements are not significant** on top of everything else. They are not useless on their own, but the other families already carry their information.
-- **The morning line would add +0.010**, more than any fundamental family. That says a good human handicapper's line still knows things the charts do not, which is useful to know. I keep it out because the point of this model is to be odds-free.
+However, pedigree, field shape, bias-adjusted last race and race-day announcements are not significant on top of everything else. They are not useless on their own, it is just that the other families already carry their information.
+
+The morning line would add +0.010, which is more than any fundamental family. That tells me a good human handicapper's line still knows things the charts do not, which is useful to know, but I keep it out because the whole point of this model is to be odds-free.
 
 ![Share of the 2025 model's total split gain by feature family.](../figures/fund_importance_families.png){#fig-importance}
 
@@ -135,15 +124,15 @@ Inside the model, class and earnings (20%) and connections (17%) carry the most 
 
 Measured alone against the closing price, the most useful ratings were sire by surface and distance, jockey, jockey by surface and distance, jockey by price range and running style, and trainer by surface and distance. The horse's own rating added almost nothing, which makes sense: the market watches horses closely, but it does not keep careful books on how a sire's offspring handle a mile on turf. All 18 types together improved on the closing price by 0.0019 on 2021 to 2022 races that were never used for tuning.
 
-The most interesting finding was about time. I let every rating drift, so a trainer could get hot or cold, and tuning chose almost no drift at all. In other words, the market misprices durable tendencies, not streaks. A trainer who is good with layoff horses stays good with layoff horses, while the hot trainer of the last month is already in the price.
+The most interesting finding was about time. I let every rating drift, so a trainer could get hot or cold, and tuning chose almost no drift at all. Meaning, the market misprices durable tendencies rather than streaks. A trainer who is good with layoff horses stays good with layoff horses, while the hot trainer of the last month is already in the price.
 
 ### What did not work
 
-- **Language model trip notes.** I had a local language model tag chart comments (blocked, wide, steadied) into eleven trip categories. A controlled test showed no gain (1.6908 versus 1.6905). The structured chart fields already carry that signal.
-- **ECDF transforms**, which turn each figure into a percentile of a historical distribution. No gain over the within-race ranks.
-- **Hot and cold streaks** for trainers and jockeys, as described above.
-- **Bias-adjusted last race**, which credits horses that ran against a track bias. Small and not significant.
-- **Model tuning.** Re-tuning the trees moved log-loss by less than 0.0005. Every real gain came from new information.
+- Language model trip notes. I had a local language model tag chart comments (blocked, wide, steadied) into eleven trip categories. A controlled test showed no gain (1.6908 versus 1.6905). The structured chart fields already carry that signal.
+- ECDF transforms, which turn each figure into a percentile of a historical distribution. No gain over the within-race ranks.
+- Hot and cold streaks for trainers and jockeys, as described above.
+- Bias-adjusted last race, which credits horses that ran against a track bias. Small and not significant.
+- Model tuning. Re-tuning the trees moved log-loss by less than 0.0005. Every real gain came from new information.
 
 ::: {.verdict}
 **Verdict:** the fundamental model improved by about 0.02 in log-loss across every year from 2019 to 2025, and almost all of that came from three ideas: rebuilt pace figures, field-relative features and the neural network blend. Entity ratings help the most recent years. Consistency across seven separate years is what makes me confident these are real gains and not a lucky test period.
@@ -151,11 +140,13 @@ The most interesting finding was about time. I let every rating drift, so a trai
 
 ## Limitations
 
-- **The ratings are young in the early years.** The ratings start in 2012, so the 2016 to 2018 training rows see immature ratings. That is why v6 is slightly worse than v5 in 2019 and 2020 and better from 2023 on. Ranking the ratings within each race should fix this, and it is the next experiment.
-- **No workouts.** Published workouts are one of the few pre-race facts a human handicapper uses that this model does not have, so I expect them to be the largest remaining gain.
-- **One country, one breed.** Everything here is North American thoroughbred racing. Harness racing and international racing have different structures.
-- **2020 is an outlier.** The pandemic year had closed tracks and unusual fields, and every version scores worst there. The walk-forward design handles it honestly, but it is a reminder that racing conditions shift.
-- **Fundamentals alone do not beat the closing price.** This model is a strong independent opinion, not a betting system. The [bet sizing paper](bet-sizing.qmd) covers how a probability turns into a bet.
+The ratings are young in the early years. They start in 2012, so the 2016 to 2018 training rows see immature ratings, which is why v6 is slightly worse than v5 in 2019 and 2020 and better from 2023 on. Ranking the ratings within each race should fix this, and it is the next experiment.
+
+The model also has no workouts. Published workouts are one of the few pre-race facts a human handicapper uses that this model does not have, so I expect them to be the largest remaining gain. Everything here is also North American thoroughbred racing, and harness racing and international racing have different structures.
+
+**2020 is an outlier:** the pandemic year had closed tracks and unusual fields, and every version scores worst there. The walk-forward design handles it honestly, but it is a good reminder that racing conditions shift.
+
+Most importantly, fundamentals alone do not beat the closing price. This model is a strong independent opinion and not a betting system on its own. The [bet sizing paper](bet-sizing.qmd) covers how a probability turns into a bet.
 
 ## What's next
 
