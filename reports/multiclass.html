@@ -302,7 +302,7 @@ window.Quarto = {
 <div>
   <div class="abstract">
     <div class="block-title">Abstract</div>
-    <p>The most natural way to model a horse race with off-the-shelf machine learning is to treat every horse as its own yes or no question: does this horse win? My first models at Lynk worked that way. This paper tests that choice head to head against the alternative, a multiclass model that asks which horse in this race wins, so the probabilities compete and always sum to one. Same data, same features, same gradient boosted trees, with only the objective changed. The multiclass model is better by 0.025 in race log-loss when both use the same raw features, which is more than any single feature family I ever added. It also learns the comparison against the field on its own, gains the most in big fields and needs about half the training data to match the binary model. Picking the winner barely changes. What changes is the quality of the probabilities, which is exactly what a bettor needs.</p>
+    <p>The most natural way to model a horse race with off-the-shelf machine learning is to treat every horse as its own yes or no question: does this horse win? My first models at Lynk worked that way. This paper tests that choice head to head against the alternative, a multiclass model that asks which horse in this race wins, so the probabilities compete and always sum to one. Both models get the same data, the same features and the same gradient boosted trees, and the only thing I changed is the objective. The multiclass model is better by 0.025 in race log-loss when both use the same raw features, which is more than any single feature family I ever added. It also learns the comparison against the field on its own, gains the most in big fields and needs about half the training data to match the binary model. However, it does not pick noticeably more winners, as the gain comes almost entirely from better probabilities on the whole field, which is the thing a bettor actually needs.</p>
   </div>
 </div>
 
@@ -359,14 +359,9 @@ Figure&nbsp;1: The same race scored both ways. The binary model’s probabilitie
 </section>
 <section id="the-experiment" class="level3">
 <h3 class="anchored" data-anchor-id="the-experiment">The experiment</h3>
-<p>To isolate the effect of the framing, I changed one thing at a time:</p>
-<ul>
-<li><strong>Model:</strong> LightGBM gradient boosted trees <span class="citation" data-cites="ke2017">(<a href="#ref-ke2017" role="doc-biblioref">Ke et al. 2017</a>)</span> with identical settings (learning rate 0.05, 63 leaves, at least 300 rows per leaf) and early stopping. The only difference is the objective: binary log-loss or the within-race softmax.</li>
-<li><strong>Normalization:</strong> the binary model is scored twice, once as is and once with its probabilities rescaled to sum to one in each race.</li>
-<li><strong>Feature sets:</strong> both objectives are trained on the absolute set and on the full set, so I can see how much of the field comparison each one learns by itself.</li>
-<li><strong>Training size:</strong> both objectives are also retrained on the last 6, 12, 24 and 42 months before the stopping window.</li>
-<li><strong>Scoring:</strong> race log-loss, the average of <span class="math inline">\(-\log p\)</span> for the actual winner, with a 95% interval from a bootstrap that resamples whole race days <span class="citation" data-cites="efron1993">(<a href="#ref-efron1993" role="doc-biblioref">Efron and Tibshirani 1993</a>)</span>. Lower is better.</li>
-</ul>
+<p>To isolate the effect of the framing, I changed one thing at a time. Both models are LightGBM gradient boosted trees <span class="citation" data-cites="ke2017">(<a href="#ref-ke2017" role="doc-biblioref">Ke et al. 2017</a>)</span> with identical settings (learning rate 0.05, 63 leaves, at least 300 rows per leaf) and early stopping, so the only difference is the objective: binary log-loss or the within-race softmax. The binary model is scored twice, once as is and once with its probabilities rescaled to sum to one in each race, which is the fairest version of binary I could build.</p>
+<p><strong>Feature sets and training size:</strong> both objectives are trained on the absolute set and on the full set, so I can see how much of the field comparison each one learns by itself. They are also retrained on the last 6, 12, 24 and 42 months before the stopping window, to see which one makes better use of the data it gets.</p>
+<p><strong>Scoring:</strong> race log-loss, the average of <span class="math inline">\(-\log p\)</span> for the actual winner, with a 95% interval from a bootstrap that resamples whole race days <span class="citation" data-cites="efron1993">(<a href="#ref-efron1993" role="doc-biblioref">Efron and Tibshirani 1993</a>)</span>. Lower is better.</p>
 </section>
 </section>
 <section id="results" class="level2">
@@ -441,7 +436,7 @@ Table&nbsp;1: Race log-loss, 2023, same data and trees, objective changed.
 </div>
 </figure>
 </div>
-<p>With the same raw features, switching the objective gained 0.025. For reference, that means the multiclass model puts about 2.5% more probability on the eventual winner, on average, across all 34,458 races in 2023. That is nearly four times the gain from the best fundamental feature family I built (pace and classic handicapping, +0.0066) and nearly three times the gain from blending in a neural network. A one-line configuration change beat weeks of feature engineering.</p>
+<p>With the same raw features, switching the objective gained 0.025. For reference, that means the multiclass model puts about 2.5% more probability on the eventual winner, on average, across all 34,458 races in 2023. That is nearly four times the gain from the best fundamental feature family I built (pace and classic handicapping, +0.0066) and nearly three times the gain from blending in a neural network, which means a one-line configuration change was worth more than weeks of feature engineering.</p>
 </section>
 <section id="the-multiclass-model-learns-the-comparison-on-its-own" class="level3">
 <h3 class="anchored" data-anchor-id="the-multiclass-model-learns-the-comparison-on-its-own">The multiclass model learns the comparison on its own</h3>
@@ -483,21 +478,19 @@ Figure&nbsp;5: Race log-loss on 2023 by months of training data, full feature se
 </section>
 <section id="where-it-does-not-help" class="level3">
 <h3 class="anchored" data-anchor-id="where-it-does-not-help">Where it does not help</h3>
-<p>Picking the winner barely changes. The top pick won 33.6% of 2023 races with the multiclass model and 32.8% with the binary model on absolute features, and the two were within 0.2 points of each other on the full set (33.3% versus 33.5%, slightly in the binary model’s favor). The gain is almost entirely in the quality of the probabilities across the whole field: how much the 15% horse and the 4% horse really deserve.</p>
+<p>The multiclass model does not pick many more winners. Its top pick won 33.6% of 2023 races with the multiclass model and 32.8% with the binary model on absolute features, and the two were within 0.2 points of each other on the full set (33.3% versus 33.5%, slightly in the binary model’s favor). The gain is almost entirely in the quality of the probabilities across the whole field: how much the 15% horse and the 4% horse really deserve.</p>
 <p>For a bettor that is the part that matters. A bet is only worth making when the model’s probability differs from the price, and the Kelly stake is sized directly from that probability <span class="citation" data-cites="kelly1956">(<a href="#ref-kelly1956" role="doc-biblioref">Kelly 1956</a>)</span>. A model that picks the same winners with better probabilities finds better prices and sizes them better, which is why I agree with Walsh and Joshi <span class="citation" data-cites="walsh2024">(<a href="#ref-walsh2024" role="doc-biblioref">2024</a>)</span> that betting models should be judged on calibration and log-loss, not accuracy.</p>
 <div class="verdict">
-<p><strong>Verdict:</strong> framing the race as one multiclass choice instead of many binary questions was worth +0.025 in log-loss on identical data, more than any feature I ever built. It learns the comparison against the field on its own, helps most in big fields and needs about half the data. It does not pick more winners. It prices them better, and pricing is the whole game.</p>
+<p><strong>Verdict:</strong> framing the race as one multiclass choice instead of many binary questions was worth +0.025 in log-loss on identical data, more than any feature I ever built. It learns the comparison against the field on its own, helps most in big fields and needs about half the data. It picks about the same winners as the binary model, but it prices the whole field better, and for a bettor the price is what decides whether a bet is worth making.</p>
 </div>
 </section>
 </section>
 <section id="limitations" class="level2">
 <h2 class="anchored" data-anchor-id="limitations">Limitations</h2>
-<ul>
-<li><strong>One market, one model family.</strong> This is North American thoroughbred racing with gradient boosted trees. I expect the result to hold for any one-winner event (the neural network in the fundamental paper uses the same within-race softmax), but I have only measured it here.</li>
-<li><strong>A well-engineered binary model closes most of the gap.</strong> With full field-relative features the difference falls from 0.025 to 0.007. It is still significant and still large in betting terms, but most of what the multiclass objective does can be approximated by enough feature engineering.</li>
-<li><strong>It needs a custom objective.</strong> Off-the-shelf multiclass classifiers assume a fixed number of classes. The race softmax has to be written as a custom objective, which is one reason so many models default to binary. The <a href="../code/lynk-framework.html">Lynk framework</a> ships one (<code>GroupSoftmaxObjective</code> and <code>fit_group_softmax</code>).</li>
-<li><strong>Winners only.</strong> This framing models the winner. Place, show and exotic bets need the full finishing order, which takes Harville-style or staged models on top <span class="citation" data-cites="harville1973 lo1995">(<a href="#ref-harville1973" role="doc-biblioref">Harville 1973</a>; <a href="#ref-lo1995" role="doc-biblioref">Lo et al. 1995</a>)</span>.</li>
-</ul>
+<p>This is one market and one model family: North American thoroughbred racing with gradient boosted trees. I expect the result to hold for any one-winner event, and the neural network in the fundamental paper already uses the same within-race softmax, but I have only measured it here.</p>
+<p>A well-engineered binary model also closes most of the gap. With the full field-relative features the difference falls from 0.025 to 0.007, which is still significant and still large in betting terms. However, it does mean that most of what the multiclass objective does can be approximated with enough feature engineering, if you are willing to do the engineering.</p>
+<p><strong>It needs a custom objective:</strong> off-the-shelf multiclass classifiers assume a fixed number of classes, so the race softmax has to be written by hand, which is probably one reason so many racing models default to binary. The <a href="../code/lynk-framework.html">Lynk framework</a> ships one (<code>GroupSoftmaxObjective</code> and <code>fit_group_softmax</code>).</p>
+<p>Finally, this framing only models the winner. Place, show and exotic bets need the full finishing order, which takes Harville-style or staged models on top <span class="citation" data-cites="harville1973 lo1995">(<a href="#ref-harville1973" role="doc-biblioref">Harville 1973</a>; <a href="#ref-lo1995" role="doc-biblioref">Lo et al. 1995</a>)</span>.</p>
 </section>
 <section id="whats-next" class="level2">
 <h2 class="anchored" data-anchor-id="whats-next">What’s next</h2>

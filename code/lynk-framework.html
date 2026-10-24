@@ -275,12 +275,7 @@ div.csl-indent {
 
 <section id="problem" class="level2">
 <h2 class="anchored" data-anchor-id="problem">Problem</h2>
-<p>The research behind the <a href="../reports/fundamental-model.html">fundamental model</a> and <a href="../reports/bet-sizing.html">bet sizing</a> papers produced more than 80 scripts. They worked, but they were written for one dataset, one machine and one question at a time. Specifically, three things made them hard to reuse:</p>
-<ul>
-<li><strong>The good ideas were buried in the specific code.</strong> The pari-mutuel solver, the leakage rules and the rating system each lived inside a script that was also tied to one particular data source.</li>
-<li><strong>The safeguards were habits, not code.</strong> Date splits, lagged features and pre-registered strategy selection were things I remembered to do, which means they were things someone else could forget.</li>
-<li><strong>Nothing ran without proprietary data.</strong> The racing data behind the research is licensed and cannot be redistributed, so nobody else could run any of it.</li>
-</ul>
+<p>The research behind the <a href="../reports/fundamental-model.html">fundamental model</a> and <a href="../reports/bet-sizing.html">bet sizing</a> papers produced more than 80 scripts. They worked, but they were written for one dataset, one machine and one question at a time. Specifically, three things made them hard to reuse. First, the good ideas were buried in the specific code. The pari-mutuel solver, the leakage rules and the rating system each lived inside a script that was also tied to one particular data source. Second, the safeguards were habits instead of code. Date splits, lagged features and pre-registered strategy selection were things I remembered to do, which means they were things someone else could easily forget. Third, nothing ran without proprietary data. The racing data behind the research is licensed and cannot be redistributed, so nobody else could run any of it.</p>
 <p><strong>Problem statement:</strong> turn the research into a framework that someone else can install, understand and extend to a new market in an afternoon, with the safeguards built into the functions rather than left to discipline.</p>
 </section>
 <section id="approach" class="level2">
@@ -294,7 +289,7 @@ div.csl-indent {
 <li><strong>Honest evaluation is a function call.</strong> Results come with day-block bootstrap intervals, returns before and after rebates, drawdown, and a pre-registered selection rule, because those are what keep a backtest from lying.</li>
 <li><strong>Every example runs without proprietary data.</strong> A seeded synthetic racing circuit has the same structure and the same traps as real racing, including a crowd that misprices some trainers and smart late money.</li>
 </ol>
-<p>The analogy that comes to mind is a full stack application. The core is the backend: it does not care what the market is. Each market module is a frontend that maps its own data and bet types onto that backend. Horse racing is the first frontend, and the next ones should only need a schema, a few features and their own bet types.</p>
+<p>Think of it like a web application with one backend and several frontends. The core is the backend, and it does not care what the market is. Each market module is a frontend that maps its own data and bet types onto that backend. Horse racing is the first frontend, and the next ones should only need a schema, a few features and their own bet types.</p>
 <div id="fig-arch" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-arch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
@@ -418,6 +413,10 @@ Table&nbsp;2: The horse racing module.
 <td><code>synthetic</code></td>
 <td>A seeded racing circuit: latent ability, trainer and jockey effects, Plackett-Luce results <span class="citation" data-cites="plackett1975 luce1959">(<a href="#ref-plackett1975" role="doc-biblioref">Plackett 1975</a>; <a href="#ref-luce1959" role="doc-biblioref">Luce 1959</a>)</span>, a crowd with blind spots and smart late money</td>
 </tr>
+<tr class="even">
+<td><code>simulator</code></td>
+<td>A full synthetic racing world: horses, trainers and jockeys with careers, races run from running-time noise, and win, place, show, exotic and multi-race pools that fill up bet by bet, with a scorecard that checks the output against the stylized facts of real racing</td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -470,24 +469,21 @@ test: log-loss  fundamental 1.9842 | crowd at decision 1.9201 | model 1.8883
 pre-registered pick: {'edge_cutoff': 0.1, 'kelly_multiplier': 0.5} active
 TEST: {'bets': 439, 'events': 329, 'turnover': 25064.0, 'profit': 3751.5794, 'roi': 0.1497, 'roi_lo': -0.1302, 'roi_hi': 0.4536, 'roi_pre_rebate': 0.1497, 'max_drawdown': -2444.4221, 'sharpe': 2.1037}
 </code></pre>
-<p><strong>Reading the output:</strong></p>
-<ul>
-<li><strong>The ratings work.</strong> In this simulated world the crowd ignores part of every trainer’s skill, and the ratings recover it, improving on the closing prices by 0.013 per race.</li>
-<li><strong>The market model beats the odds it bets into</strong> (1.8883 versus 1.9201 on the test months), because it combines the crowd with information the crowd ignores.</li>
-<li><strong>The selection rule picked one setting before the test was scored</strong>, and on test that setting returned +15% on $25,064 of turnover. However, the 95% interval runs from -13% to +45%. Two months and 439 bets are not enough to call it proven, and the framework says so instead of hiding it. When I ran a version of this world with a smaller planted edge, the same rule declared every setting inactive and refused to bet, which is exactly what it should do.</li>
-</ul>
+<p><strong>Reading the output:</strong> in this simulated world the crowd ignores part of every trainer’s skill, and the ratings recover it, improving on the closing prices by 0.013 per race. The market model then beats the odds it bets into (1.8883 versus 1.9201 on the test months), because it combines the crowd with information the crowd ignores.</p>
+<p>The selection rule picked one setting before the test was scored, and on test that setting returned +15% on $25,064 of turnover. However, the 95% interval runs from -13% to +45%, and two months and 439 bets are not enough to call it proven, so the framework reports it that way instead of hiding it. When I ran a version of this world with a smaller planted edge, the same rule declared every setting inactive and refused to bet, which is exactly what it should do.</p>
 </section>
 <section id="testing" class="level2">
 <h2 class="anchored" data-anchor-id="testing">Testing</h2>
 <p>The test suite checks the math, not just that the code runs. A few examples:</p>
 <ul>
-<li><strong>The portfolio gradient matches finite differences</strong> for every stake, so the solver’s exact gradients are right.</li>
-<li><strong>The closed-form max-EV bet matches a brute-force search</strong> over 20,000 stakes.</li>
-<li><strong>Mutually exclusive Kelly matches a numerical optimizer</strong> on a book with a realistic margin.</li>
-<li><strong>Ratings recover a planted trainer effect</strong> in simulated races and beat the offset they start from.</li>
-<li><strong>History features never see today’s race,</strong> connection form is zero on the first racing day, and the leakage assertion raises an error when a feature arrives after the decision time.</li>
+<li>The portfolio gradient matches finite differences for every stake, so the solver’s exact gradients are right.</li>
+<li>The closed-form max-EV bet matches a brute-force search over 20,000 stakes.</li>
+<li>Mutually exclusive Kelly matches a numerical optimizer on a book with a realistic margin.</li>
+<li>Ratings recover a planted trainer effect in simulated races and beat the offset they start from.</li>
+<li>History features never see today’s race, connection form is zero on the first racing day and the leakage assertion raises an error when a feature arrives after the decision time.</li>
+<li>The simulator’s pools pay out by the US rules (dime breakage and the $2.10 minimum) and its scorecard runs end to end.</li>
 </ul>
-<p>All 21 tests pass. They run with <code>pytest</code> from the repository root.</p>
+<p>All 29 tests pass. They run with <code>pytest</code> from the repository root.</p>
 </section>
 <section id="adding-a-new-market" class="level2">
 <h2 class="anchored" data-anchor-id="adding-a-new-market">Adding a new market</h2>
@@ -501,13 +497,9 @@ TEST: {'bets': 439, 'events': 329, 'turnover': 25064.0, 'profit': 3751.5794, 'ro
 </section>
 <section id="limitations" class="level2">
 <h2 class="anchored" data-anchor-id="limitations">Limitations</h2>
-<ul>
-<li><strong>This is version 0.1.</strong> The core is tested, but the horse racing module is a clean re-implementation of research code, not a production betting system.</li>
-<li><strong>No data connectors.</strong> Racing data is licensed, so the repository ships the schema and a synthetic circuit instead of parsers.</li>
-<li><strong>The late-money forecast is deliberately simple.</strong> My research stack has a learned late-money simulator that forecasts where each horse’s price will close. The framework ships a transparent default and leaves the simulator as the plug-in point it should be.</li>
-<li><strong>No live execution.</strong> Placing bets, rate limits and track cutoffs for automated bettors are outside the scope of the package.</li>
-<li><strong>Nothing here is betting advice.</strong> A positive backtest with an interval that includes zero is not proven, and the framework is built to say so.</li>
-</ul>
+<p>This is version 0.1. The core is tested, but the horse racing module is a clean re-implementation of research code and not a production betting system. There are also no data connectors, because racing data is licensed, so the repository ships the schema and the synthetic circuits instead of parsers.</p>
+<p><strong>The late-money forecast is deliberately simple:</strong> my research stack has a learned late-money simulator that forecasts where each horse’s price will close. The framework ships a transparent default and leaves that forecast as a plug-in point, which is where it belongs.</p>
+<p>Finally, there is no live execution. Placing bets, rate limits and track cutoffs for automated bettors are outside the scope of the package, and nothing here is betting advice. A positive backtest with an interval that includes zero is not proven, and the framework is built to say so.</p>
 </section>
 <section id="whats-next" class="level2">
 <h2 class="anchored" data-anchor-id="whats-next">What’s next</h2>
@@ -517,7 +509,7 @@ TEST: {'bets': 439, 'events': 329, 'turnover': 25064.0, 'profit': 3751.5794, 'ro
 <li>A second market module, starting with fixed-odds sports exchanges, to prove the core is truly market-agnostic.</li>
 <li>API reference pages generated from the docstrings.</li>
 </ol>
-<p>Racing taught me most of what is in this package, but very little of it is really about horses. Probabilities that respect the event, prices that respect the pool, stakes that respect the bankroll and tests that respect the calendar apply to any market where people bet against each other. That is what Lynk is for.</p>
+<p>Racing taught me most of what is in this package, however very little of it is really about horses. Keeping probabilities inside the event, pricing against the pool, sizing against the bankroll and testing in calendar order apply to any market where people bet against each other, and I am looking forward to proving that on the next one.</p>
 </section>
 <section id="installation" class="level2 unnumbered">
 <h2 class="unnumbered anchored" data-anchor-id="installation">Installation</h2>

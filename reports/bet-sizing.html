@@ -270,9 +270,9 @@ window.Quarto = {
 <section id="problem" class="level2">
 <h2 class="anchored" data-anchor-id="problem">Problem</h2>
 <p>Suppose a model says a horse has a 25% chance to win and the tote board shows 4-1, a $5.00 payout per $1. The bet has an edge: <span class="math inline">\(0.25 \times 5 - 1 = +25\%\)</span> per dollar. How much should I bet?</p>
-<p>Bet too little and the edge does nothing for the bankroll. Bet too much and a normal losing streak wipes it out, even though every single bet had positive expected value. In a pari-mutuel pool there is a third trap: bet enough and my own money drives the payout down until the edge is gone.</p>
+<p>If I bet too little the edge barely moves the bankroll, and if I bet too much a perfectly normal losing streak can wipe it out, even though every single bet had positive expected value. A pari-mutuel pool adds a third trap on top of those two, which is that if I bet enough, my own money drives the payout down until the edge is gone.</p>
 <p><strong>Problem statement:</strong> turn model probabilities into stakes that grow the bankroll as fast as possible without unacceptable risk, in markets where the price depends on the bet.</p>
-<p>The rest of this paper climbs a ladder. Each step fixes one thing the previous step ignored.</p>
+<p>The rest of this paper climbs a ladder, where each step fixes one thing the step before it ignored.</p>
 <div id="tbl-ladder" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-tbl figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ladder-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
@@ -356,12 +356,12 @@ Figure&nbsp;1: Expected log growth per bet for the 25% horse at 4-1. Growth peak
 </figcaption>
 </figure>
 </div>
-<p>The curve has a shape every bettor should memorize. Half Kelly keeps three quarters of the growth (0.56% versus 0.74% per bet). Twice Kelly keeps almost none (0.12%), and a little past that the growth turns negative: the bankroll shrinks over time even though every bet has a 25% edge. Over-betting is not just riskier, it is slower.</p>
+<p>The curve has a shape every bettor should memorize. Half Kelly keeps three quarters of the growth (0.56% versus 0.74% per bet). Twice Kelly keeps almost none (0.12%), and a little past that the growth turns negative, meaning the bankroll shrinks over time even though every bet has a 25% edge. Therefore over-betting does not buy faster growth in exchange for more risk. It gets you more risk and slower growth at the same time.</p>
 <p>In the Lynk framework this is <code>lynk.core.kelly.kelly_fraction(p, decimal_odds)</code>, and <code>expected_log_growth</code> draws the curve.</p>
 </section>
 <section id="step-2-fractional-kelly" class="level2">
 <h2 class="anchored" data-anchor-id="step-2-fractional-kelly">Step 2: Fractional Kelly</h2>
-<p>Kelly assumes the probabilities are exactly right. They never are. If the model says 25% but the truth is 23%, the true Kelly stake is 3.75%, and betting 6.25% is already 1.7 times too much.</p>
+<p>Kelly assumes the probabilities are exactly right, which they never are. For example, if the model says 25% but the truth is 23%, the true Kelly stake is 3.75%, and betting 6.25% is already 1.7 times too much.</p>
 <p>I simulated 1,000 bets on that horse, 2,000 times, where the model believes 25% and the truth is 23%.</p>
 <div id="fig-paths" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
@@ -418,7 +418,7 @@ Table&nbsp;2: Simulated outcomes with a two-point probability error.
 </div>
 </figure>
 </div>
-<p>With a small error, half Kelly beats full Kelly on the median outcome too, not just on risk. Full Kelly leaves one path in ten with 4 cents on the dollar. This is why practitioners bet a fraction of Kelly <span class="citation" data-cites="maclean2011 uhrin2021">(<a href="#ref-maclean2011" role="doc-biblioref">MacLean et al. 2011</a>; <a href="#ref-uhrin2021" role="doc-biblioref">Uhrı́n et al. 2021</a>)</span>, and why Baker and McHale <span class="citation" data-cites="baker2013">(<a href="#ref-baker2013" role="doc-biblioref">2013</a>)</span> show that shrinking the Kelly stake is the right response to estimation error. Walsh and Joshi <span class="citation" data-cites="walsh2024">(<a href="#ref-walsh2024" role="doc-biblioref">2024</a>)</span> make the related point that for betting, a model should be chosen on calibration, not accuracy: Kelly sizes on the probability itself, so a miscalibrated probability is a mis-sized bet.</p>
+<p>With only a two-point error, half Kelly beats full Kelly on the median outcome as well as on risk, while full Kelly leaves one path in ten holding 4 cents on the dollar. This is why practitioners bet a fraction of Kelly <span class="citation" data-cites="maclean2011 uhrin2021">(<a href="#ref-maclean2011" role="doc-biblioref">MacLean et al. 2011</a>; <a href="#ref-uhrin2021" role="doc-biblioref">Uhrı́n et al. 2021</a>)</span>, and why Baker and McHale <span class="citation" data-cites="baker2013">(<a href="#ref-baker2013" role="doc-biblioref">2013</a>)</span> show that shrinking the Kelly stake is the right response to estimation error. Walsh and Joshi <span class="citation" data-cites="walsh2024">(<a href="#ref-walsh2024" role="doc-biblioref">2024</a>)</span> make the related point that for betting, a model should be chosen on calibration, not accuracy: Kelly sizes on the probability itself, so a miscalibrated probability is a mis-sized bet.</p>
 </section>
 <section id="step-3-mutually-exclusive-outcomes" class="level2">
 <h2 class="anchored" data-anchor-id="step-3-mutually-exclusive-outcomes">Step 3: Mutually exclusive outcomes</h2>
@@ -508,7 +508,7 @@ Table&nbsp;3: Joint Kelly bets more on the value horses and even adds a small ne
 </div>
 </figure>
 </div>
-<p>Two things stand out. The joint solution bets more on horses 3 and 5 than treating them separately, because the two bets cover each other’s losses. It also places a small bet on horse 6 even though that bet has a negative edge on its own, because it pays off exactly when the other two lose. In Lynk this is <code>kelly_mutually_exclusive</code>, and <code>kelly_scenarios</code> solves the general case numerically for any set of outcomes.</p>
+<p>Two things stand out in this table. First, the joint solution bets more on horses 3 and 5 than treating them separately, because the two bets cover each other’s losses. Second, it places a small bet on horse 6 even though that bet has a negative edge on its own, because it pays off exactly when the other two lose. In Lynk this is <code>kelly_mutually_exclusive</code>, and <code>kelly_scenarios</code> solves the general case numerically for any set of outcomes.</p>
 </section>
 <section id="step-4-my-own-money-moves-the-price" class="level2">
 <h2 class="anchored" data-anchor-id="step-4-my-own-money-moves-the-price">Step 4: My own money moves the price</h2>
@@ -540,7 +540,7 @@ Figure&nbsp;3: Expected profit versus stake for the 25% horse in a $100,000 pool
 </section>
 <section id="step-5-price-at-the-odds-that-pay-not-the-odds-on-the-screen" class="level2">
 <h2 class="anchored" data-anchor-id="step-5-price-at-the-odds-that-pay-not-the-odds-on-the-screen">Step 5: Price at the odds that pay, not the odds on the screen</h2>
-<p>Pari-mutuel odds keep moving until betting closes, and the payout is set by the final pool. A large share of the money arrives in the last minutes, and much of it is well informed <span class="citation" data-cites="asch1982">(<a href="#ref-asch1982" role="doc-biblioref">Asch et al. 1982</a>)</span>. Recent work on interim odds shows that late odds movement predicts returns even after controlling for the final odds <span class="citation" data-cites="hanyu2025">(<a href="#ref-hanyu2025" role="doc-biblioref">Hanyu et al. 2025</a>)</span>. The practical consequence: <strong>late money tends to pile onto the horses that go on to win,</strong> so a winner’s final payout is usually lower than the payout I saw when I bet.</p>
+<p>Pari-mutuel odds keep moving until betting closes, and the payout is set by the final pool. A large share of the money arrives in the last minutes, and much of it is well informed <span class="citation" data-cites="asch1982">(<a href="#ref-asch1982" role="doc-biblioref">Asch et al. 1982</a>)</span>. Recent work on interim odds shows that late odds movement predicts returns even after controlling for the final odds <span class="citation" data-cites="hanyu2025">(<a href="#ref-hanyu2025" role="doc-biblioref">Hanyu et al. 2025</a>)</span>. The practical consequence is that <strong>late money tends to pile onto the horses that go on to win,</strong> so a winner’s final payout is usually lower than the payout I saw when I bet.</p>
 <div id="fig-late" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-late-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
@@ -555,11 +555,7 @@ Figure&nbsp;4: In the synthetic racing circuit, horses that went on to win gaine
 <p><span class="math display">\[
 \text{EV} = p \cdot \mathbb{E}[\text{payout} \mid \text{horse wins}] - 1,
 \]</span></p>
-<p>using a model of the final pool, conditional on the horse winning, not the current odds. Two lessons from building this:</p>
-<ul>
-<li><strong>A late-money simulator is part of the probability model.</strong> Forecasting where each horse’s price will close after the bet is placed is a model in its own right, and I built one for exactly that job.</li>
-<li><strong>Price consistently.</strong> If the probability model uses the late-money simulator, the payout must use the same simulator. When I upgraded the simulator for probabilities but kept the old version for payouts, the strategy got worse at every setting. Making them consistent fixed it.</li>
-</ul>
+<p>using a model of the final pool, conditional on the horse winning, rather than the current odds. I learned two lessons building this. The first is that a late-money simulator is really part of the probability model, since forecasting where each horse’s price will close after the bet is placed is a model in its own right, and I built one for exactly that job. The second is to price consistently. If the probability model uses the late-money simulator, the payout has to use the same simulator. When I upgraded the simulator for probabilities but kept the old version for payouts, the strategy got worse at every setting, and making the two consistent fixed it.</p>
 </section>
 <section id="step-6-the-portfolio-solver" class="level2">
 <h2 class="anchored" data-anchor-id="step-6-the-portfolio-solver">Step 6: The portfolio solver</h2>
@@ -586,7 +582,7 @@ Figure&nbsp;5: The same race solved three ways. Adding the place pool doubles ex
 </figure>
 </div>
 <p>On a six-horse example, win-only betting earns 34 basis points of expected log growth on two bets. Adding the place pool, where my favorite value horse is underbet, doubles that to 68 basis points. Adding the exacta jumps to 113 basis points across 17 bets, and <strong>that is exactly the result not to trust.</strong> In this example the exacta pool was built from a different finishing model than my probabilities, so the solver sees edges that are really a disagreement between two models. A joint optimizer amplifies whichever pool’s expected values are most optimistic.</p>
-<p>That is what happened in my real research too. Solved jointly across win, place, show and exacta, the optimizer put most of its money into the pools whose predicted edges were least calibrated, and it lost money in validation while the same engine restricted to the win pool made money. <strong>The rule I follow now: a pool only enters the portfolio after its predicted expected values are shown to be calibrated out of sample.</strong> The solver is a powerful tool, and the calibration gate is what keeps it honest.</p>
+<p>That is what happened in my real research too. Solved jointly across win, place, show and exacta, the optimizer put most of its money into the pools whose predicted edges were least calibrated, and it lost money in validation while the same engine restricted to the win pool made money. <strong>The rule I follow now: a pool only enters the portfolio after its predicted expected values are shown to be calibrated out of sample.</strong> The solver will happily find the best bets for whatever numbers it is given, so the calibration check is the part that decides whether those numbers deserve to be bet.</p>
 <p>In Lynk this is <code>lynk.core.portfolio.optimize_portfolio</code>, with <code>Pool</code> and <code>Scenario</code> objects, and <code>lynk.horse_racing.bets.multi_pool_race_bets</code> builds the scenarios for a race.</p>
 </section>
 <section id="step-7-risk-constrained-kelly" class="level2">
@@ -639,22 +635,14 @@ Table&nbsp;4: The same bet under different drawdown budgets.
 </section>
 <section id="evaluating-a-sizing-rule-honestly" class="level2">
 <h2 class="anchored" data-anchor-id="evaluating-a-sizing-rule-honestly">Evaluating a sizing rule honestly</h2>
-<p>Sizing rules have settings (an edge cutoff, a Kelly fraction), and choosing them on the same data used to report results is a quiet form of overfitting. Every strategy in my research follows the same protocol:</p>
-<ul>
-<li><strong>Choose on validation, score test once.</strong> The rule is written down first: among settings with at least 300 bets, pick the highest validation log growth, and only bet if it is positive. Then the test period is scored a single time.</li>
-<li><strong>Report intervals, not points.</strong> Returns get a 95% interval from resampling whole race days <span class="citation" data-cites="kunsch1989">(<a href="#ref-kunsch1989" role="doc-biblioref">Künsch 1989</a>)</span>.</li>
-<li><strong>Separate the edge from the rebate.</strong> Rebates (a share of turnover returned by the betting platform) can be most of the margin in pari-mutuel betting <span class="citation" data-cites="ziemba2023">(<a href="#ref-ziemba2023" role="doc-biblioref">Ziemba 2023</a>)</span>, so I always report returns before and after rebates.</li>
-<li><strong>Measure capacity.</strong> Because my money moves the price, profit rises with bet size, peaks and falls. The size where it peaks is part of the strategy, not an afterthought.</li>
-</ul>
+<p>Sizing rules have settings (an edge cutoff, a Kelly fraction), and choosing them on the same data used to report results is a quiet form of overfitting. Every strategy in my research follows the same protocol. First, the selection rule is written down before looking at results: among settings with at least 300 bets, pick the highest validation log growth, and only bet if it is positive. The test period is then scored a single time. Second, returns are reported with a 95% interval from resampling whole race days <span class="citation" data-cites="kunsch1989">(<a href="#ref-kunsch1989" role="doc-biblioref">Künsch 1989</a>)</span> rather than as a single number.</p>
+<p>Third, I separate the edge from the rebate. Rebates (a share of turnover returned by the betting platform) can be most of the margin in pari-mutuel betting <span class="citation" data-cites="ziemba2023">(<a href="#ref-ziemba2023" role="doc-biblioref">Ziemba 2023</a>)</span>, so I always report returns before and after rebates. Finally, I measure capacity. Because my money moves the price, profit rises with bet size, peaks and then falls, and the size where it peaks is as much a part of the strategy as the edge cutoff.</p>
 </section>
 <section id="limitations" class="level2">
 <h2 class="anchored" data-anchor-id="limitations">Limitations</h2>
-<ul>
-<li><strong>The solver trusts its scenarios.</strong> If the finish-order probabilities or the pool forecasts are wrong, the solver will confidently size wrong bets. Calibration checks have to come first.</li>
-<li><strong>One race at a time.</strong> The solver handles all pools in one race, but not correlations across races or across a day’s card beyond what fractional Kelly and the drawdown constraint absorb.</li>
-<li><strong>Late money is forecast, not known.</strong> The final pool is uncertain when the bet is placed. The current framework uses the forecast’s mean; carrying its uncertainty into the solver is a natural extension <span class="citation" data-cites="metel2017">(<a href="#ref-metel2017" role="doc-biblioref">Metel 2017</a>)</span>.</li>
-<li><strong>Execution is outside the math.</strong> Some tracks stop large automated bettors one or two minutes before post, and that changes which snapshot a strategy can use.</li>
-</ul>
+<p>The solver trusts its scenarios. If the finish-order probabilities or the pool forecasts are wrong, it will confidently size the wrong bets, which is why the calibration checks have to come first. It also works one race at a time. It handles every pool in a race, but not the correlations across races or across a day’s card, beyond what fractional Kelly and the drawdown constraint absorb.</p>
+<p><strong>Late money is a forecast:</strong> the final pool is uncertain when the bet is placed, and the current framework only uses the forecast’s average. Carrying its uncertainty into the solver is a natural extension <span class="citation" data-cites="metel2017">(<a href="#ref-metel2017" role="doc-biblioref">Metel 2017</a>)</span>.</p>
+<p>Finally, execution sits outside the math. Some tracks stop large automated bettors one or two minutes before post, and that changes which odds snapshot a strategy can actually use.</p>
 </section>
 <section id="whats-next" class="level2">
 <h2 class="anchored" data-anchor-id="whats-next">What’s next</h2>
